@@ -190,16 +190,34 @@ struct OverviewSection: View {
         }
     }
 
+    // Intel build: split out of the view bodies so swiftc type-checks them in time.
+    private func planLabel(_ plan: PlanProgress) -> String {
+        var text: String = "\(plan.done) " + L("z", "of")
+        text += " \(plan.total) " + L("kroků", "steps")
+        if let eta = plan.eta {
+            text += L(" · zbývá ~", " · ~") + Format.duration(eta) + L("", " left")
+        }
+        return text
+    }
+
+    private func budgetLabel(_ fraction: Double) -> String {
+        var text: String = L("Dnes", "Today") + " \(Format.price(s.today.cost)) "
+        text += L("z", "of") + " \(Format.price(Settings.dailyBudget)) · \(Format.percent(fraction))"
+        if let runway = s.budgetRunway(Settings.dailyBudget) {
+            text += L(" · při současném tempu vydrží ", " · at the current pace lasts ") + Format.runway(runway)
+        }
+        return text
+    }
+
     private func planBox(_ plan: PlanProgress) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(L("Postup", "Progress"))
                 Spacer()
-                Text("\(plan.done) " + L("z", "of") + " \(plan.total) " + L("kroků", "steps")
-                     + (plan.eta.map { L(" · zbývá ~", " · ~") + Format.duration($0) + L("", " left") } ?? ""))
+                Text(planLabel(plan))
                     .monospacedDigit().foregroundStyle(.secondary)
             }
-            Meter(fraction: plan.fraction, color: plan.done == plan.total ? Palette.done : Palette.claude)
+            Meter(fraction: plan.fraction, color: (plan.done == plan.total ? Palette.done : Palette.claude) as NSColor)
             if let current = plan.current {
                 Text(L("Teď: ", "Now: ") + current).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
@@ -329,9 +347,8 @@ struct OverviewSection: View {
             }
             if Settings.dailyBudget > 0 {
                 let fraction = s.today.cost / Settings.dailyBudget
-                Meter(fraction: fraction, color: fraction >= 1 ? Palette.danger : fraction >= 0.8 ? Palette.warning : Palette.claude)
-                Text(L("Dnes", "Today") + " \(Format.price(s.today.cost)) " + L("z", "of") + " \(Format.price(Settings.dailyBudget)) · \(Format.percent(fraction))"
-                     + (s.budgetRunway(Settings.dailyBudget).map { L(" · při současném tempu vydrží ", " · at the current pace lasts ") + Format.runway($0) } ?? ""))
+                Meter(fraction: fraction, color: (fraction >= 1 ? Palette.danger : (fraction >= 0.8 ? Palette.warning : Palette.claude)) as NSColor)
+                Text(budgetLabel(fraction))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

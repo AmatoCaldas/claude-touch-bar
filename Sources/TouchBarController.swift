@@ -109,11 +109,17 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         super.init()
         bar.delegate = self
 
-        let all = [ID.state, ID.context, ID.tokens, ID.cost, ID.graph, ID.model, ID.session, ID.fiveHours,
-                   ID.today, ID.wide, ID.switcher, ID.more, ID.back, ID.approvalInfo, ID.allow, ID.always,
-                   ID.deny, ID.stop, ID.new, ID.push, ID.sessions, ID.detail, ID.cardInfo, ID.cardClose]
-                   + ID.cardButtons + [ID.mode, ID.plan, ID.collapse] + ID.modeOptions
-                   + BarItem.allCases.map(ID.item) + [ID.effort] + ID.modelOptions
+        // Intel build: appended step by step so swiftc type-checks it in time.
+        var all: [NSTouchBarItem.Identifier] = [ID.state, ID.context, ID.tokens, ID.cost, ID.graph, ID.model,
+                   ID.session, ID.fiveHours, ID.today, ID.wide, ID.switcher, ID.more, ID.back, ID.approvalInfo,
+                   ID.allow, ID.always, ID.deny, ID.stop, ID.new, ID.push, ID.sessions, ID.detail, ID.cardInfo,
+                   ID.cardClose]
+        all += ID.cardButtons
+        all += [ID.mode, ID.plan, ID.collapse]
+        all += ID.modeOptions
+        all += BarItem.allCases.map(ID.item)
+        all += [ID.effort]
+        all += ID.modelOptions
         for id in Set(all) {
             let button = NSButton(title: "", target: self, action: #selector(tapped(_:)))
             button.identifier = NSUserInterfaceItemIdentifier(id.rawValue)

@@ -5,7 +5,9 @@ cd "$(dirname "$0")"
 
 APP="build/Claude Touch Bar.app"
 mkdir -p build
-swiftc -O -swift-version 5 -target arm64-apple-macos14.0 Sources/*.swift -o build/ClaudeTouchBar
+# Build for the machine's own architecture (arm64 on Apple Silicon, x86_64 on Intel).
+ARCH="${ARCH:-$(uname -m)}"
+swiftc -O -swift-version 5 -target "$ARCH-apple-macos14.0" Sources/*.swift -o build/ClaudeTouchBar
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
