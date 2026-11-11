@@ -17,10 +17,14 @@ cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 cp build/ClaudeTouchBar "$APP/Contents/MacOS/"
 # A stable local certificate keeps the Accessibility permission across
 # rebuilds; ad-hoc signing changes identity every build.
+# Extended attributes (provenance, Finder info) make codesign refuse the bundle.
+xattr -cr "$APP"
 IDENTITY="ClaudeTouchBar Local"
 if security find-identity -p codesigning 2>/dev/null | grep -q "\"$IDENTITY\""; then
     codesign --force --sign "$IDENTITY" "$APP" >/dev/null 2>&1
 else
     codesign --force --sign - "$APP" >/dev/null
 fi
+# Fail loudly: an unsigned app can't keep the Accessibility permission.
+codesign --verify --strict "$APP"
 echo "Pronto: $APP"

@@ -9,6 +9,7 @@ pkill -x ClaudeTouchBar 2>/dev/null || true
 mkdir -p "$HOME/Applications"
 rm -rf "$DEST"
 cp -R "build/Claude Touch Bar.app" "$DEST"
+xattr -cr "$DEST"
 
 PLIST="$HOME/Library/LaunchAgents/local.ClaudeTouchBar.plist"
 mkdir -p "$HOME/Library/LaunchAgents"
