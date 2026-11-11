@@ -6,8 +6,13 @@ enum BarItem: String, CaseIterable, Identifiable {
     case state, plan, context, session, fiveHours, today, week, month, allTime
     case tokens, cost, rate, active, graph, model, files, waiting, compact
     case push, modelPicker, wide, switcher, more, collapse
+    case recent
 
     var id: String { rawValue }
+
+    /// Items the layout editor offers. Commit and push is left out: the
+    /// repositories here are worked on by their own sessions, not from the bar.
+    static let offered = allCases.filter { $0 != .push }
 
     var title: String {
         switch self {
@@ -35,6 +40,7 @@ enum BarItem: String, CaseIterable, Identifiable {
         case .switcher: return L("Trocar layout ⇄", "Switch layout ⇄")
         case .more: return L("Ações ⋯", "Actions ⋯")
         case .collapse: return L("Recolher ⤓", "Shrink ⤓")
+        case .recent: return L("Chats recentes", "Recent chats")
         }
     }
 
@@ -56,13 +62,13 @@ enum LayoutItems {
     static func defaults(_ layout: Layout) -> [BarItem] {
         switch layout {
         case .compact:
-            return [.state, .plan, .context, .session, .today, .waiting, .compact, .graph, .model, .push,
+            return [.state, .recent, .plan, .context, .session, .today, .waiting, .compact, .graph, .model,
                     .switcher, .more, .collapse]
         case .overview:
-            return [.context, .plan, .session, .fiveHours, .today, .week, .allTime, .waiting, .push, .switcher, .more,
+            return [.context, .recent, .plan, .session, .fiveHours, .today, .week, .allTime, .waiting, .switcher, .more,
                     .collapse]
         case .minimal:
-            return [.graph, .plan, .wide, .push, .switcher, .more, .collapse]
+            return [.graph, .recent, .plan, .wide, .switcher, .more, .collapse]
         }
     }
 

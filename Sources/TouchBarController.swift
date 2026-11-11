@@ -40,6 +40,9 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         static let week = item(.week), month = item(.month), allTime = item(.allTime), rate = item(.rate), active = item(.active)
         static let files = item(.files), waiting = item(.waiting), compact = item(.compact)
         static let modelPicker = item(.modelPicker)
+        static let recent = item(.recent)
+        /// One button per recent chat, in the row that ⋯ › Chats opens.
+        static let chats = (0..<RecentChats.capacity).map { NSTouchBarItem.Identifier("local.ClaudeTouchBar.chat\($0)") }
         static let effort = NSTouchBarItem.Identifier("local.ClaudeTouchBar.effort")
         static let modelOptions = ClaudeUI.touchBarModels.indices.map {
             NSTouchBarItem.Identifier("local.ClaudeTouchBar.modelOption\($0)")
@@ -56,7 +59,7 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
     var onTrayTap: (() -> Void)?
     var onLayoutChange: ((Layout) -> Void)?
     var onApproval: ((UUID, ApprovalDecision) -> Void)?
-    var onCycleSession: (() -> Void)?
+    var onOpenChat: ((URL) -> Void)?
     var onCardButton: ((String) -> Void)?
     var onCardDismiss: (() -> Void)?
     var onSetMode: ((String) -> Void)?
@@ -69,6 +72,8 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
     private var showingModes = false
     /// The model row (Opus / Fable / Sonnet / Haiku + effort).
     private var showingModels = false
+    /// The recent chats row.
+    private var showingChats = false
 
     /// In Claude the bar takes the whole strip with your layout; elsewhere it
     /// pops up compact, next to brightness and volume.
@@ -99,6 +104,8 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
     private var animationTimer: Timer?
     private var tick = 0
     private let font = NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .regular)
+    /// Proportional, so six chat titles fit on one row.
+    private let chatFont = NSFont.systemFont(ofSize: 13)
 
     /// Blinks the Control Strip icon until you look at Claude.
     var needsAttention = false {
@@ -120,6 +127,7 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         all += BarItem.allCases.map(ID.item)
         all += [ID.effort]
         all += ID.modelOptions
+        all += ID.chats
         for id in Set(all) {
             let button = NSButton(title: "", target: self, action: #selector(tapped(_:)))
             button.identifier = NSUserInterfaceItemIdentifier(id.rawValue)
@@ -131,7 +139,8 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         localizeLabels()
         buttons[ID.switcher]?.widthAnchor.constraint(equalToConstant: 44).isActive = true
         buttons[ID.graph]?.imagePosition = .imageOnly
-        configure(ID.sessions, symbol: "rectangle.stack", label: nil)
+        configure(ID.sessions, symbol: "bubble.left.and.bubble.right", label: nil)
+        configure(ID.recent, symbol: "bubble.left.and.bubble.right", label: nil)
         // Push shows the git state next to its icon, so it isn't icon-only.
         configure(ID.push, symbol: "arrow.up.circle", label: nil)
         configure(ID.mode, symbol: "shield.lefthalf.filled", label: nil)
@@ -292,13 +301,20 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
             bar.defaultItemIdentifiers = [ID.back] + ID.modeOptions
         } else if showingModels {
             bar.defaultItemIdentifiers = [ID.back] + ID.modelOptions + [ID.effort]
+        } else if showingChats {
+            bar.defaultItemIdentifiers = chatIdentifiers
         } else if showingActions {
-            bar.defaultItemIdentifiers = [ID.back, ID.allow, ID.deny, ID.stop, ID.new, ID.push, ID.mode,
-                                          ID.modelPicker, ID.sessions, ID.detail]
+            bar.defaultItemIdentifiers = [ID.back, ID.allow, ID.deny, ID.stop, ID.new, ID.sessions, ID.mode,
+                                          ID.modelPicker, ID.detail]
         } else {
             bar.defaultItemIdentifiers = layoutIdentifiers()
         }
         render()
+    }
+
+    /// ‹ Back and one button per recent chat.
+    private var chatIdentifiers: [NSTouchBarItem.Identifier] {
+        [ID.back] + ID.chats.prefix(snapshot.recentChats.count)
     }
 
     /// Your chosen items for the layout, minus those with nothing to show
@@ -382,6 +398,16 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
             setShowingActions(true)
             onCycleEffort?()
         case ID.waiting: onOpenWaiting?()
+        case ID.sessions, ID.recent:
+            showingChats = true
+            setShowingActions(true)
+            applyIdentifiers()
+            if isPresented { present() }
+        case _ where ID.chats.contains(id):
+            if let index = ID.chats.firstIndex(of: id), index < snapshot.recentChats.count {
+                setShowingActions(false)
+                onOpenChat?(snapshot.recentChats[index].url)
+            }
         case ID.compact:
             if KeySender.sendMessage("/compact") {
                 flash(L("⇣ Enviado: /compact", "⇣ Sent: /compact"), Palette.claude)
@@ -398,10 +424,6 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         case ID.new:
             setShowingActions(false)
             KeySender.send(KeySender.n, flags: .maskCommand)
-        case ID.sessions:
-            // Stay on the actions row so you can keep cycling.
-            setShowingActions(true)
-            onCycleSession?()
         case ID.push:
             // Claude writes the commit message and pushes in the open chat.
             if KeySender.sendMessage(L("Faça commit e push das mudanças", "Commit and push the changes")) {
@@ -436,6 +458,7 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         showingActions = false
         showingModes = false
         showingModels = false
+        showingChats = false
         actionsTimeout?.cancel()
         confirmation = (text, color)
         applyIdentifiers()
@@ -456,10 +479,11 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
             actionsTimeout = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 15, execute: work)
         }
-        let closingModes = !show && (showingModes || showingModels)
+        let closingModes = !show && (showingModes || showingModels || showingChats)
         if !show {
             showingModes = false
             showingModels = false
+            showingChats = false
         }
         guard show != showingActions || closingModes else { return }
         showingActions = show
@@ -474,8 +498,10 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         updateAnimation()
         // Items that come and go (plan, push, compact…) need the bar rebuilt.
         let normalBar = confirmation == nil && approvals.isEmpty && card == nil
-            && !showingActions && !showingModes && !showingModels
-        if normalBar && layoutIdentifiers() != bar.defaultItemIdentifiers {
+            && !showingActions && !showingModes && !showingModels && !showingChats
+        let chatsBar = confirmation == nil && approvals.isEmpty && card == nil && showingChats
+        if (normalBar && layoutIdentifiers() != bar.defaultItemIdentifiers)
+            || (chatsBar && chatIdentifiers != bar.defaultItemIdentifiers) {
             applyIdentifiers()
             if isPresented { present() }
         } else {
@@ -642,13 +668,9 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
             set(ID.wide, [(L(" Nenhuma sessão do Code", " No Code session"), Palette.dim)])
         }
 
-        let sessionLabel: String
-        if s.isAutoSelected {
-            sessionLabel = L(" Sessão: auto", " Session: auto") + (sessionPosition.map { " (\($0))" } ?? "")
-        } else {
-            sessionLabel = " " + (sessionPosition ?? "") + " " + truncate(s.title ?? s.project ?? L("sessão", "session"), 12)
-        }
-        set(ID.sessions, [(sessionLabel, .white)])
+        set(ID.sessions, [(" Chats", .white)])
+        set(ID.recent, [(" Chats", .white)])
+        renderChats()
 
         // Push: branch, uncommitted changes (●) and unpushed commits (↑).
         if let git = s.git {
@@ -698,6 +720,25 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         renderCard()
     }
 
+    /// Each chat: its state glyph and title; the one shown on the bar is highlighted.
+    private func renderChats() {
+        for (index, chat) in snapshot.recentChats.enumerated() {
+            let (mark, color) = chatGlyph(chat.activity)
+            buttons[ID.chats[index]]?.bezelColor = chat.url == snapshot.sessionURL
+                ? Palette.claude.blended(withFraction: 0.45, of: .black) : nil
+            set(ID.chats[index], [(mark + " ", color), (truncate(chat.title, 16), .white)], font: chatFont)
+        }
+    }
+
+    private func chatGlyph(_ activity: Activity) -> (String, NSColor) {
+        switch activity {
+        case .working: return ("✳", Palette.claude)
+        case .waiting: return ("●", Palette.waiting)
+        case .done: return ("✓", Palette.done)
+        case .idle: return ("·", Palette.dim)
+        }
+    }
+
     private func renderCard() {
         guard let card else { return }
         set(ID.cardInfo, [("◆ ", Palette.claude), (truncate(card.title, 34), .white)])
@@ -733,10 +774,10 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         text.count > length ? String(text.prefix(length - 1)) + "…" : text
     }
 
-    private func set(_ id: NSTouchBarItem.Identifier, _ parts: [(String, NSColor)]) {
+    private func set(_ id: NSTouchBarItem.Identifier, _ parts: [(String, NSColor)], font: NSFont? = nil) {
         let result = NSMutableAttributedString()
         for (text, color) in parts {
-            result.append(NSAttributedString(string: text, attributes: [.foregroundColor: color, .font: font]))
+            result.append(NSAttributedString(string: text, attributes: [.foregroundColor: color, .font: font ?? self.font]))
         }
         buttons[id]?.attributedTitle = result
     }

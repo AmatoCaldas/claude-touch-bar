@@ -324,12 +324,15 @@ enum Format {
         return String(format: "%.1f", value).replacingOccurrences(of: ".", with: L(",", "."))
     }
 
+    /// "$4.76" / "$4,76" (decimal separator follows the UI language).
     static func cost(_ usd: Double) -> String {
+        let text: String
         switch usd {
-        case ..<10: return String(format: "$%.2f", usd)
-        case ..<100: return String(format: "$%.1f", usd)
-        default: return String(format: "$%.0f", usd)
+        case ..<10: text = String(format: "$%.2f", usd)
+        case ..<100: text = String(format: "$%.1f", usd)
+        default: text = String(format: "$%.0f", usd)
         }
+        return text.replacingOccurrences(of: ".", with: L(",", "."))
     }
 
     /// "R$ 4,60", "R$ 133", "R$ 12.345" at the PTAX rate.

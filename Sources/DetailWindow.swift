@@ -17,6 +17,9 @@ final class DetailModel: ObservableObject {
         case overview, touchBar, integration, git, general
         var id: String { rawValue }
 
+        /// Tabs shown in the sidebar; Git and Push is hidden along with the ↑ button.
+        static let visible = allCases.filter { $0 != .git }
+
         var title: String {
             switch self {
             case .overview: return L("Visão geral", "Overview")
@@ -63,7 +66,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(DetailModel.Section.allCases, selection: Binding(
+            List(DetailModel.Section.visible, selection: Binding(
                 get: { model.section },
                 set: { if let section = $0 { model.section = section } }
             )) { section in
@@ -417,7 +420,7 @@ struct TouchBarSection: View {
 
             HStack {
                 Menu(L("Adicionar item", "Add item")) {
-                    ForEach(BarItem.allCases.filter { !items.contains($0) }) { item in
+                    ForEach(BarItem.offered.filter { !items.contains($0) }) { item in
                         Button(item.title + (item.condition.map { " (\($0))" } ?? "")) {
                             items.append(item)
                             save()

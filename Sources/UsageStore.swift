@@ -53,6 +53,9 @@ struct Snapshot {
     var plan: PlanProgress?
     /// Sessions active in the last few hours, newest first.
     var sessions: [SessionInfo] = []
+    /// The chats you opened last (most recent first), topped up with the
+    /// most active ones; at most `RecentChats.capacity`.
+    var recentChats: [SessionInfo] = []
     var isAutoSelected = true
     /// Tool currently running, as reported by the PreToolUse hook.
     var tool: String?
@@ -180,10 +183,12 @@ final class UsageStore {
     }
 
     /// `selected` pins a session (nil picks automatically); `hooks` are the
-    /// latest hook states keyed by transcript URL.
-    func refresh(selected: URL?, hooks: [URL: HookState], _ completion: @escaping (Snapshot) -> Void) {
+    /// latest hook states keyed by transcript URL; `recent` are transcript
+    /// paths of the chats you opened, most recent first.
+    func refresh(selected: URL?, hooks: [URL: HookState], recent: [String] = [],
+                 _ completion: @escaping (Snapshot) -> Void) {
         queue.async {
-            let snapshot = self.scan(selected: selected, hooks: hooks)
+            let snapshot = self.scan(selected: selected, hooks: hooks, recent: recent)
             DispatchQueue.main.async { completion(snapshot) }
         }
     }
@@ -237,7 +242,7 @@ final class UsageStore {
 
     // MARK: - Scanning
 
-    private func scan(selected: URL?, hooks: [URL: HookState]) -> Snapshot {
+    private func scan(selected: URL?, hooks: [URL: HookState], recent: [String] = []) -> Snapshot {
         let now = Date()
         let dayStart = Calendar.current.startOfDay(for: now)
         let fiveHoursAgo = now.addingTimeInterval(-5 * 3600)
@@ -312,18 +317,26 @@ final class UsageStore {
 
         // Recent sessions, each with its best-known activity.
         let recentLimit = now.addingTimeInterval(-3 * 3600)
-        var infos: [SessionInfo] = []
-        for file in topLevel {
-            let last = sessionActivity[file.url] ?? file.mtime
-            guard last >= recentLimit || file.url == newest || file.url == selected,
-                  let state = files[file.url] else { continue }
-            let (activity, _) = resolve(state, lastActivity: last, hook: hooks[file.url], now: now)
+        func info(for url: URL, mtime: Date) -> SessionInfo? {
+            guard let state = files[url] else { return nil }
+            let last = sessionActivity[url] ?? mtime
+            let (activity, _) = resolve(state, lastActivity: last, hook: hooks[url], now: now)
             let title = state.title
                 ?? state.cwd.map { URL(fileURLWithPath: $0).lastPathComponent }
-                ?? file.url.deletingPathExtension().lastPathComponent
-            infos.append(SessionInfo(url: file.url, title: title, activity: activity, lastActivity: last))
+                ?? url.deletingPathExtension().lastPathComponent
+            return SessionInfo(url: url, title: title, activity: activity, lastActivity: last)
         }
-        snap.sessions = infos.sorted { $0.lastActivity > $1.lastActivity }
+        snap.sessions = topLevel
+            .filter { (sessionActivity[$0.url] ?? $0.mtime) >= recentLimit || $0.url == newest || $0.url == selected }
+            .compactMap { info(for: $0.url, mtime: $0.mtime) }
+            .sorted { $0.lastActivity > $1.lastActivity }
+
+        // Chats you opened, in the order you opened them, then the busiest others.
+        let byPath = Dictionary(topLevel.map { ($0.url.standardizedFileURL.path, $0) }, uniquingKeysWith: { first, _ in first })
+        let opened = recent.compactMap { byPath[$0] }.compactMap { info(for: $0.url, mtime: $0.mtime) }
+        let openedURLs = Set(opened.map(\.url))
+        snap.recentChats = Array((opened + snap.sessions.filter { !openedURLs.contains($0.url) })
+            .prefix(RecentChats.capacity))
 
         // Pinned session if it still exists, otherwise whichever needs you
         // (waiting first), otherwise the most recent one.

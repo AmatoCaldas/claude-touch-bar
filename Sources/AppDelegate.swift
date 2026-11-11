@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         touchBar.onLayoutChange = { [weak self] layout in self?.detail.model.layout = layout }
         touchBar.onApproval = { [weak self] id, decision in self?.hooks.answer(id, decision) }
-        touchBar.onCycleSession = { [weak self] in self?.cycleSession() }
+        touchBar.onOpenChat = { [weak self] url in self?.openChat(url) }
         touchBar.onCardButton = { [weak self] label in self?.pressCardButton(label) }
         touchBar.onCardDismiss = { [weak self] in self?.setCard(nil) }
         touchBar.onSetMode = { [weak self] mode in self?.setMode(mode) }
@@ -144,7 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func refresh() {
         ExchangeRate.refreshIfNeeded()
-        store.refresh(selected: selectedSession, hooks: hookStates) { [weak self] snapshot in
+        store.refresh(selected: selectedSession, hooks: hookStates, recent: RecentChats.paths) { [weak self] snapshot in
             self?.apply(snapshot)
         }
     }
@@ -163,19 +163,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notifyTransitions(snapshot)
     }
 
-    private func cycleSession() {
-        let urls = lastSnapshot.sessions.map(\.url)
-        guard !urls.isEmpty else { return }
-        if let current = selectedSession, let index = urls.firstIndex(of: current) {
-            selectedSession = index + 1 < urls.count ? urls[index + 1] : nil
-        } else {
-            selectedSession = urls[0]
-        }
+    /// A chat picked on the Touch Bar: show it on the bar and open it in
+    /// Claude, so the bar and the window show the same chat.
+    private func openChat(_ url: URL) {
+        guard let chat = lastSnapshot.recentChats.first(where: { $0.url == url }) else { return }
+        selectedSession = url
+        RecentChats.touch(url)
         refresh()
-        // Also open it in Claude, so the bar and the window show the same chat.
-        if let url = selectedSession, let title = lastSnapshot.sessions.first(where: { $0.url == url })?.title {
-            openInClaude(title)
-        }
+        ClaudeApp.activate()
+        openInClaude(chat.title)
     }
 
     private func openInClaude(_ title: String) {
@@ -269,8 +265,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "UserPromptSubmit", "PostToolUse", "PostToolUseFailure":
             state.activity = .working
             state.tool = nil
-            // You wrote something new in that chat: its card is answered.
-            if event.name == "UserPromptSubmit", card?.transcriptURL == url { setCard(nil) }
+            if event.name == "UserPromptSubmit" {
+                // You wrote in that chat: it's the one you opened last, and its card is answered.
+                RecentChats.touch(url)
+                if card?.transcriptURL == url { setCard(nil) }
+            }
         case "PreToolUse":
             state.activity = .working
             state.tool = event.toolName
