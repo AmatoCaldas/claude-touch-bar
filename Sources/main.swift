@@ -81,6 +81,13 @@ if arguments.contains("--dump") {
         print("Dólar PTAX: R$ " + String(format: "%.4f", ExchangeRate.usdBRL).replacingOccurrences(of: ".", with: ",") + (ExchangeRate.date.map { " (BCB \($0))" } ?? " (padrão)"))
     }
     print(L("Hooks", "Hooks") + ": " + (HookInstaller.isInstalled ? L("ligados", "on") : L("desligado", "off")))
+    if let central = TremedStatus.central() {
+        print("Central: " + (central.isHealthy ? "ok" : "falha \(central.failing) · atenção \(central.warning)"))
+    } else {
+        print("Central: " + L("sem resposta do servidor", "no answer from the server"))
+    }
+    print("Notebook: " + (TremedStatus.notebookOnline() ? "online" : "offline"))
+    print(L("Chats recentes", "Recent chats") + ": \(RecentChats.paths.count)")
     if let cwd = s.cwd {
         if let git = Git.status(at: cwd) {
             print("Git (\(cwd)): " + L("branch", "branch") + " \(git.branch), " + L("mudanças", "changes") + " \(git.changes), "

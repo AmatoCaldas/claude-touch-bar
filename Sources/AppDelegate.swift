@@ -18,6 +18,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var gitStatus: [String: GitStatus] = [:]
     private var plans: [URL: PlanState] = [:]
     private var gitTimer: Timer?
+    private var central: CentralHealth?
+    private var notebookOnline: Bool?
+    private var tremedTimers: [Timer] = []
 
     private var claudeFrontmost = false
     /// True when the bar came up because Claude got focus, so it should also
@@ -56,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         RunLoop.main.add(git, forMode: .common)
         gitTimer = git
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refreshGit() }
+        startTremedChecks()
 
         let model = detail.model
         model.onLayoutPicked = { [weak self] layout in self?.touchBar.setLayout(layout) }
@@ -153,6 +157,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var snapshot = incoming
         snapshot.approval = hooks.approvals.first
         if let folder = gitFolder(for: snapshot) { snapshot.git = gitStatus[folder] }
+        snapshot.central = central
+        snapshot.notebookOnline = notebookOnline
         if let url = snapshot.sessionURL { snapshot.plan = plans[url]?.progress }
         // The pinned session disappeared: back to automatic.
         if selectedSession != nil && snapshot.isAutoSelected { selectedSession = nil }
@@ -179,6 +185,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let opened = ClaudeUI.openSession(titled: title)
             DispatchQueue.main.async {
                 if !opened { self?.touchBar.flash(L("Não vejo a sessão “\(title)” na barra lateral", "Can't see session “\(title)” in the sidebar"), Palette.warning) }
+            }
+        }
+    }
+
+    /// Central de Operações every 5 min, notebook every minute, off the main thread.
+    private func startTremedChecks() {
+        let checks: [(TimeInterval, () -> Void)] = [
+            (TremedStatus.centralInterval, { [weak self] in self?.check(TremedStatus.central) { self?.central = $0 } }),
+            (TremedStatus.notebookInterval, { [weak self] in self?.check(TremedStatus.notebookOnline) { self?.notebookOnline = $0 } }),
+        ]
+        for (interval, run) in checks {
+            let timer = Timer(timeInterval: interval, repeats: true) { _ in run() }
+            RunLoop.main.add(timer, forMode: .common)
+            tremedTimers.append(timer)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: run)
+        }
+    }
+
+    private func check<T>(_ probe: @escaping () -> T, then store: @escaping (T) -> Void) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let result = probe()
+            DispatchQueue.main.async {
+                store(result)
+                self?.refresh()
             }
         }
     }

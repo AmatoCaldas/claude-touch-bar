@@ -49,6 +49,11 @@ struct Snapshot {
     var mode: String?
     /// Git state of the Push repository; filled in by the app.
     var git: GitStatus?
+    /// Central de Operações health (nil until the first answer or when the
+    /// server can't be reached); filled in by the app.
+    var central: CentralHealth?
+    /// Whether the notebook answers (nil before the first check); filled in by the app.
+    var notebookOnline: Bool?
     /// Progress through Claude's task list; filled in by the app.
     var plan: PlanProgress?
     /// Sessions active in the last few hours, newest first.

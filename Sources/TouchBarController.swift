@@ -41,6 +41,7 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         static let files = item(.files), waiting = item(.waiting), compact = item(.compact)
         static let modelPicker = item(.modelPicker)
         static let recent = item(.recent)
+        static let central = item(.central), notebook = item(.notebook)
         /// One button per recent chat, in the row that ⋯ › Chats opens.
         static let chats = (0..<RecentChats.capacity).map { NSTouchBarItem.Identifier("local.ClaudeTouchBar.chat\($0)") }
         static let effort = NSTouchBarItem.Identifier("local.ClaudeTouchBar.effort")
@@ -340,7 +341,7 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
         let item = NSCustomTouchBarItem(identifier: identifier)
         item.view = button
         switch identifier {
-        case ID.graph, ID.model, ID.fiveHours, ID.sessions:
+        case ID.graph, ID.model, ID.fiveHours, ID.sessions, ID.notebook:
             item.visibilityPriority = .low
         case ID.allTime:
             // When the bar runs out of room it goes after 5 h, before anything else.
@@ -398,6 +399,17 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
             setShowingActions(true)
             onCycleEffort?()
         case ID.waiting: onOpenWaiting?()
+        case ID.central:
+            if let central = snapshot.central, !central.isHealthy {
+                flash("⚠ " + truncate((central.failing + central.warning).joined(separator: ", "), 60), Palette.warning)
+            }
+            NSWorkspace.shared.open(TremedStatus.centralURL)
+        case ID.notebook:
+            switch snapshot.notebookOnline {
+            case true?: flash(L("● Notebook online: tremed-postgres e bling disponíveis", "● Notebook online: tremed-postgres and bling available"), Palette.done)
+            case false?: flash(L("● Notebook fora da rede: tremed-postgres e bling não respondem", "● Notebook unreachable: tremed-postgres and bling are down"), Palette.danger)
+            case nil: flash(L("Verificando o notebook…", "Checking the notebook…"), Palette.dim)
+            }
         case ID.sessions, ID.recent:
             showingChats = true
             setShowingActions(true)
@@ -668,6 +680,7 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
             set(ID.wide, [(L(" Nenhuma sessão do Code", " No Code session"), Palette.dim)])
         }
 
+        renderTremed()
         set(ID.sessions, [(" Chats", .white)])
         set(ID.recent, [(" Chats", .white)])
         renderChats()
@@ -718,6 +731,24 @@ final class TouchBarController: NSObject, NSTouchBarDelegate {
 
         renderApproval()
         renderCard()
+    }
+
+    /// Central: ✕ failures and ! warnings, or ✓; notebook: a green or red dot.
+    private func renderTremed() {
+        if let central = snapshot.central {
+            if central.isHealthy {
+                set(ID.central, [("✓ ", Palette.done), ("Central", Palette.dim)])
+            } else {
+                var parts: [(String, NSColor)] = [("Central", .white)]
+                if !central.failing.isEmpty { parts.append((" ✕\(central.failing.count)", Palette.danger)) }
+                if !central.warning.isEmpty { parts.append((" !\(central.warning.count)", Palette.warning)) }
+                set(ID.central, parts)
+            }
+        } else {
+            set(ID.central, [("Central ?", Palette.dim)])
+        }
+        let dot: NSColor = snapshot.notebookOnline.map { $0 ? Palette.done : Palette.danger } ?? Palette.dim
+        set(ID.notebook, [("● ", dot), ("Notebook", Palette.dim)])
     }
 
     /// Each chat: its state glyph and title; the one shown on the bar is highlighted.

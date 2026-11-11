@@ -6,7 +6,7 @@ enum BarItem: String, CaseIterable, Identifiable {
     case state, plan, context, session, fiveHours, today, week, month, allTime
     case tokens, cost, rate, active, graph, model, files, waiting, compact
     case push, modelPicker, wide, switcher, more, collapse
-    case recent
+    case recent, central, notebook
 
     var id: String { rawValue }
 
@@ -41,6 +41,8 @@ enum BarItem: String, CaseIterable, Identifiable {
         case .more: return L("Ações ⋯", "Actions ⋯")
         case .collapse: return L("Recolher ⤓", "Shrink ⤓")
         case .recent: return L("Chats recentes", "Recent chats")
+        case .central: return L("Central de Operações (falhas)", "Central de Operações (failures)")
+        case .notebook: return L("Notebook online (MCPs)", "Notebook online (MCPs)")
         }
     }
 
@@ -62,11 +64,11 @@ enum LayoutItems {
     static func defaults(_ layout: Layout) -> [BarItem] {
         switch layout {
         case .compact:
-            return [.state, .recent, .plan, .context, .session, .today, .waiting, .compact, .graph, .model,
-                    .switcher, .more, .collapse]
+            return [.state, .recent, .plan, .context, .session, .today, .waiting, .compact, .central, .notebook,
+                    .graph, .model, .switcher, .more, .collapse]
         case .overview:
-            return [.context, .recent, .plan, .session, .fiveHours, .today, .week, .allTime, .waiting, .switcher, .more,
-                    .collapse]
+            return [.context, .recent, .plan, .session, .fiveHours, .today, .week, .allTime, .waiting, .central,
+                    .notebook, .switcher, .more, .collapse]
         case .minimal:
             return [.graph, .recent, .plan, .wide, .switcher, .more, .collapse]
         }
