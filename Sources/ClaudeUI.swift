@@ -348,7 +348,7 @@ enum ClaudeUI {
 
         /// "✓ Done: <session>" with a button that opens it.
         static func finished(_ session: SessionInfo) -> Card {
-            Card(transcriptURL: session.url, title: L("✓ Hotovo: ", "✓ Done: ") + session.title, buttons: [L("Otevřít", "Open")],
+            Card(transcriptURL: session.url, title: L("✓ Pronto: ", "✓ Done: ") + session.title, buttons: [L("Abrir", "Open")],
                  openSession: session.title, lifetime: 60)
         }
 
@@ -360,9 +360,9 @@ enum ClaudeUI {
                 guard let title = input["title"] as? String else { return nil }
                 switch input["initiation"] as? String {
                 case "offer"?:
-                    return Card(transcriptURL: transcript, title: L("Nová session: ", "New session: ") + title, buttons: ["Start", "Do it here"])
+                    return Card(transcriptURL: transcript, title: L("Nova sessão: ", "New session: ") + title, buttons: ["Start", "Do it here"])
                 case "own_initiative"?:
-                    return Card(transcriptURL: transcript, title: L("Návrh: ", "Suggestion: ") + title, buttons: ["Start"])
+                    return Card(transcriptURL: transcript, title: L("Sugestão: ", "Suggestion: ") + title, buttons: ["Start"])
                 default:
                     return nil
                 }
@@ -385,7 +385,7 @@ enum ClaudeUI {
                 let labels = options.compactMap { $0["label"] as? String }
                 guard !labels.isEmpty else { return nil }
                 // Picking an option only selects it; Submit sends the answer.
-                return Card(transcriptURL: transcript, title: question["question"] as? String ?? L("Otázka", "Question"),
+                return Card(transcriptURL: transcript, title: question["question"] as? String ?? L("Pergunta", "Question"),
                             buttons: Array(labels.prefix(3)), submit: "Submit")
             default:
                 return nil

@@ -185,14 +185,14 @@ final class HookServer {
 
         if name == "PermissionRequest" {
             guard holdsApprovals, !cardTools.contains(toolName ?? "") else {
-                HookLog.write((details + ["→ do dialogu v aplikaci (Claude je v popředí nebo schvalování vypnuté)"]).joined(separator: " "))
+                HookLog.write((details + ["→ para o diálogo do app (Claude na frente ou aprovação desligada)"]).joined(separator: " "))
                 close(fd)  // no decision: the app shows its own dialog
                 return
             }
-            HookLog.write((details + ["→ čeká na Touch Bar"]).joined(separator: " "))
+            HookLog.write((details + ["→ esperando na Touch Bar"]).joined(separator: " "))
             let suggestions = obj["permission_suggestions"]
             let request = ApprovalRequest(
-                id: UUID(), transcriptURL: transcript, toolName: toolName ?? L("Nástroj", "Tool"),
+                id: UUID(), transcriptURL: transcript, toolName: toolName ?? L("Ferramenta", "Tool"),
                 summary: summary ?? "", canAlwaysAllow: (suggestions as? [Any])?.isEmpty == false,
                 received: Date())
             lock.withLock { pending[request.id] = Pending(request: request, fd: fd, suggestions: suggestions) }
@@ -206,7 +206,7 @@ final class HookServer {
             if movedOn.contains(name), let transcript {
                 let stale = approvals.filter { $0.transcriptURL == transcript }
                 for request in stale {
-                    HookLog.write("Žádost pro \(request.toolName) vyřízena v aplikaci")
+                    HookLog.write("Pedido de \(request.toolName) resolvido no app")
                     release(request.id)
                 }
             }
@@ -221,7 +221,7 @@ final class HookServer {
 
     func answer(_ id: UUID, _ decision: ApprovalDecision) {
         guard let item = lock.withLock({ pending.removeValue(forKey: id) }) else { return }
-        HookLog.write("Odpověď z Touch Baru: \(decision) pro \(item.request.toolName)")
+        HookLog.write("Resposta da Touch Bar: \(decision) para \(item.request.toolName)")
         var body: [String: Any]
         switch decision {
         case .allow:
@@ -232,7 +232,7 @@ final class HookServer {
                 body["updatedPermissions"] = suggestions
             }
         case .deny:
-            body = ["behavior": "deny", "message": L("Zamítnuto z Touch Baru.", "Denied from the Touch Bar.")]
+            body = ["behavior": "deny", "message": L("Negado pela Touch Bar.", "Denied from the Touch Bar.")]
         }
         let reply: [String: Any] = ["hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": body]]
         if let data = try? JSONSerialization.data(withJSONObject: reply) {
@@ -245,7 +245,7 @@ final class HookServer {
     /// Lets the request fall through to the app's own permission dialog.
     func release(_ id: UUID) {
         guard let item = lock.withLock({ pending.removeValue(forKey: id) }) else { return }
-        HookLog.write("Žádost pro \(item.request.toolName) předána dialogu v aplikaci nebo hook skončil")
+        HookLog.write("Pedido de \(item.request.toolName) passou para o diálogo do app ou o hook terminou")
         close(item.fd)
         publishApprovals()
     }
@@ -360,7 +360,7 @@ enum HookClient {
     /// `ClaudeTouchBar --answer allow|always|deny` answers the oldest request.
     static func answer(_ decision: String) -> Never {
         guard let fd = connectToApp() else {
-            print(L("Aplikace neběží.", "The app isn't running."))
+            print(L("O app não está rodando.", "The app isn't running."))
             exit(1)
         }
         let body = Data(#"{"hook_event_name":"ClaudeTouchBarAnswer","decision":"\#(decision)"}"#.utf8)

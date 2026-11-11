@@ -5,8 +5,8 @@ enum Layout: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .compact: return L("Kompaktní", "Compact")
-        case .overview: return L("Přehled", "Overview")
+        case .compact: return L("Compacto", "Compact")
+        case .overview: return L("Visão geral", "Overview")
         case .minimal: return "Minimal"
         }
     }
@@ -14,22 +14,22 @@ enum Layout: Int, CaseIterable {
     var next: Layout { Layout(rawValue: (rawValue + 1) % Layout.allCases.count) ?? .compact }
 }
 
-/// The app's UI language; `.system` is Czech when macOS prefers Czech.
+/// The app's UI language; `.system` is Portuguese when macOS prefers Portuguese.
 enum Lang: String, CaseIterable {
-    case system, cs, en
+    case system, pt, en
 
     var title: String {
         switch self {
-        case .system: return L("Podle systému", "System")
-        case .cs: return "Čeština"
+        case .system: return L("Sistema", "System")
+        case .pt: return "Português"
         case .en: return "English"
         }
     }
 }
 
-/// The Czech or the English text, whichever the UI language is.
-func L(_ czech: String, _ english: String) -> String {
-    Settings.czech ? czech : english
+/// The Portuguese or the English text, whichever the UI language is.
+func L(_ portuguese: String, _ english: String) -> String {
+    Settings.portuguese ? portuguese : english
 }
 
 enum Settings {
@@ -39,18 +39,18 @@ enum Settings {
         get { Lang(rawValue: defaults.string(forKey: "language") ?? "") ?? .system }
         set {
             defaults.set(newValue.rawValue, forKey: "language")
-            czech = resolveCzech()
+            portuguese = resolvePortuguese()
         }
     }
 
     /// Cached, since every Touch Bar redraw asks.
-    private(set) static var czech = resolveCzech()
+    private(set) static var portuguese = resolvePortuguese()
 
-    private static func resolveCzech() -> Bool {
+    private static func resolvePortuguese() -> Bool {
         switch language {
-        case .cs: return true
+        case .pt: return true
         case .en: return false
-        case .system: return Locale.preferredLanguages.first?.hasPrefix("cs") ?? false
+        case .system: return Locale.preferredLanguages.first?.hasPrefix("pt") ?? false
         }
     }
 
@@ -118,13 +118,13 @@ enum Settings {
         set { defaults.set(max(0, newValue), forKey: "dailyBudget") }
     }
 
-    /// Add the Kč equivalent after $ amounts while the UI is Czech.
-    static var showCZK: Bool {
-        get { bool("showCZK", default: true) }
-        set { defaults.set(newValue, forKey: "showCZK") }
+    /// Add the R$ equivalent after $ amounts while the UI is Portuguese.
+    static var showBRL: Bool {
+        get { bool("showBRL", default: true) }
+        set { defaults.set(newValue, forKey: "showBRL") }
     }
 
-    static var showsCZK: Bool { czech && showCZK }
+    static var showsBRL: Bool { portuguese && showBRL }
 
     private static func bool(_ key: String, default value: Bool) -> Bool {
         defaults.object(forKey: key) as? Bool ?? value
@@ -239,7 +239,7 @@ extension Format {
 
     /// "~40 min", "~2,5 h" ("~2.5 h"), "došel" ("used up").
     static func runway(_ hours: Double) -> String {
-        if hours <= 0 { return L("došel", "used up") }
+        if hours <= 0 { return L("esgotado", "used up") }
         if hours < 1 { return "~\(max(1, Int(hours * 60))) min" }
         if hours < 10 { return "~" + String(format: "%.1f", hours).replacingOccurrences(of: ".", with: L(",", ".")) + " h" }
         return "~\(Int(hours)) h"
@@ -298,12 +298,11 @@ enum LaunchAtLogin {
 }
 
 enum Format {
-    /// Scaled to the size with the UI language's unit: "1,2 mil." / "1.2M",
-    /// "45 tis." / "45k", "3 mld." / "3B" (an English billion is a Czech
-    /// miliarda), "bil." / "T".
+    /// Scaled to the size: "1,2M" / "1.2M", "45k", "3B", "T". The decimal
+    /// separator follows the UI language.
     static func tokens(_ n: Int) -> String {
         guard abs(n) >= 1_000 else { return "\(n)" }
-        let units = Settings.czech ? ["tis.", "mil.", "mld.", "bil."] : ["k", "M", "B", "T"]
+        let units = ["k", "M", "B", "T"]
         var value = Double(n)
         var index = -1
         while index < units.count - 1 && abs(value) >= 1_000 {
@@ -316,7 +315,7 @@ enum Format {
             rounded /= 1_000
             index += 1
         }
-        return number(rounded) + (Settings.czech ? "\u{00A0}" : "") + units[index]
+        return number(rounded) + units[index]
     }
 
     /// "1,2" / "1.2", without a trailing ",0".
@@ -333,27 +332,27 @@ enum Format {
         }
     }
 
-    /// "620 Kč", "4,6 Kč", "12 345 Kč" at the ČNB rate.
-    static func czk(_ usd: Double) -> String {
-        let kc = usd * ExchangeRate.usdCZK
-        if kc < 10 { return String(format: "%.1f", kc).replacingOccurrences(of: ".", with: ",") + "\u{00A0}Kč" }
-        var digits = String(Int(kc.rounded()))
+    /// "R$ 4,60", "R$ 133", "R$ 12.345" at the PTAX rate.
+    static func brl(_ usd: Double) -> String {
+        let reais = usd * ExchangeRate.usdBRL
+        if reais < 10 { return "R$\u{00A0}" + String(format: "%.2f", reais).replacingOccurrences(of: ".", with: ",") }
+        var digits = String(Int(reais.rounded()))
         var grouped = ""
         while digits.count > 3 {
-            grouped = "\u{00A0}" + digits.suffix(3) + grouped
+            grouped = "." + digits.suffix(3) + grouped
             digits = String(digits.dropLast(3))
         }
-        return digits + grouped + "\u{00A0}Kč"
+        return "R$\u{00A0}" + digits + grouped
     }
 
-    /// "$27 (≈ 620 Kč)" when Kč is on, otherwise just "$27".
+    /// "$27 (≈ R$ 150)" when R$ is on, otherwise just "$27".
     static func price(_ usd: Double) -> String {
-        Settings.showsCZK ? cost(usd) + " (≈\u{00A0}" + czk(usd) + ")" : cost(usd)
+        Settings.showsBRL ? cost(usd) + " (≈\u{00A0}" + brl(usd) + ")" : cost(usd)
     }
 
-    /// The Touch Bar's shorter "(620 Kč)"; empty when Kč is off.
-    static func czkSuffix(_ usd: Double) -> String {
-        Settings.showsCZK ? " (" + czk(usd) + ")" : ""
+    /// The Touch Bar's shorter "(R$ 150)"; empty when R$ is off.
+    static func brlSuffix(_ usd: Double) -> String {
+        Settings.showsBRL ? " (" + brl(usd) + ")" : ""
     }
 
     static func duration(_ seconds: TimeInterval) -> String {
@@ -362,17 +361,17 @@ enum Format {
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 
-    /// "18. 10. 2026" / "Oct 18, 2026".
+    /// "18 de out. de 2026" / "Oct 18, 2026".
     static func day(_ date: Date) -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: L("cs_CZ", "en_US"))
+        f.locale = Locale(identifier: L("pt_BR", "en_US"))
         f.dateStyle = .medium
         f.timeStyle = .none
         return f.string(from: date)
     }
 
     static func percent(_ fraction: Double) -> String {
-        "\(Int((fraction * 100).rounded()))" + L(" %", "%")
+        "\(Int((fraction * 100).rounded()))" + L("%", "%")
     }
 }
 

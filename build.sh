@@ -23,4 +23,4 @@ if security find-identity -p codesigning 2>/dev/null | grep -q "\"$IDENTITY\""; 
 else
     codesign --force --sign - "$APP" >/dev/null
 fi
-echo "Hotovo: $APP"
+echo "Pronto: $APP"

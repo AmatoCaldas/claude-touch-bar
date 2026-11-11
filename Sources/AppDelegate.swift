@@ -64,10 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.refresh()
         }
         model.onApproval = { [weak self] id, decision in self?.hooks.answer(id, decision) }
-        var czech = Settings.czech
+        var portuguese = Settings.portuguese
         model.onSettingsChanged = { [weak self] in
-            if Settings.czech != czech {
-                czech = Settings.czech
+            if Settings.portuguese != portuguese {
+                portuguese = Settings.portuguese
                 self?.touchBar.languageChanged()
             }
             self?.updateHold()
@@ -182,7 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let opened = ClaudeUI.openSession(titled: title)
             DispatchQueue.main.async {
-                if !opened { self?.touchBar.flash(L("Sezení „\(title)“ v postranním panelu nevidím", "Can't see session “\(title)” in the sidebar"), Palette.warning) }
+                if !opened { self?.touchBar.flash(L("Não vejo a sessão “\(title)” na barra lateral", "Can't see session “\(title)” in the sidebar"), Palette.warning) }
             }
         }
     }
@@ -207,7 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let done = ClaudeUI.choose(model, in: "Model:")
             DispatchQueue.main.async {
-                self?.touchBar.flash(done ? "✓ Model: " + model : L("Výběr modelu v Claudovi nevidím", "Can't see the model picker in Claude"),
+                self?.touchBar.flash(done ? "✓ Model: " + model : L("Não vejo o seletor de modelo no Claude", "Can't see the model picker in Claude"),
                                      done ? Palette.done : Palette.warning)
             }
         }
@@ -222,7 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let level = label?.components(separatedBy: " ").last {
                     self.touchBar.setEffortLabel(level)
                 } else {
-                    self.touchBar.flash(L("Úsilí v Claudovi nevidím", "Can't see effort in Claude"), Palette.warning)
+                    self.touchBar.flash(L("Não vejo o esforço no Claude", "Can't see effort in Claude"), Palette.warning)
                 }
             }
         }
@@ -243,11 +243,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 guard let self else { return }
                 if done {
-                    self.touchBar.flash(L("✓ Režim: ", "✓ Mode: ") + mode, Palette.done)
+                    self.touchBar.flash(L("✓ Modo: ", "✓ Mode: ") + mode, Palette.done)
                     if let url = self.lastSnapshot.sessionURL { self.hookStates[url]?.mode = mode }
                     self.refresh()
                 } else {
-                    self.touchBar.flash(L("Přepínač režimu v Claudovi nevidím", "Can't see the mode picker in Claude"), Palette.warning)
+                    self.touchBar.flash(L("Não vejo o seletor de modo no Claude", "Can't see the mode picker in Claude"), Palette.warning)
                 }
             }
         }
@@ -317,7 +317,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if hadCard && !claudeFrontmost && !autoPresented { schedulePopHide(after: 2) }
             return
         }
-        HookLog.write("Karta na Touch Baru: \(newCard.title) [\(newCard.buttons.joined(separator: " | "))]")
+        HookLog.write("Cartão na Touch Bar: \(newCard.title) [\(newCard.buttons.joined(separator: " | "))]")
         if claudeFrontmost {
             touchBar.present()
         } else {
@@ -370,9 +370,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.touchBar.flash("✓ " + label, Palette.done)
                     if !self.claudeFrontmost && !self.autoPresented { self.schedulePopHide(after: 2) }
                 } else if !KeySender.isTrusted {
-                    self.touchBar.flash(L("Povol aplikaci Zpřístupnění v Nastavení systému", "Allow the app in System Settings → Accessibility"), Palette.warning)
+                    self.touchBar.flash(L("Libere o app em Ajustes do Sistema → Acessibilidade", "Allow the app in System Settings → Accessibility"), Palette.warning)
                 } else {
-                    self.touchBar.flash(L("Tlačítko „\(label)“ nevidím, otevři ten chat v Claudovi", "Can't see the “\(label)” button, open that chat in Claude"), Palette.warning)
+                    self.touchBar.flash(L("Não vejo o botão “\(label)”, abra esse chat no Claude", "Can't see the “\(label)” button, open that chat in Claude"), Palette.warning)
                 }
             }
         }

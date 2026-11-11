@@ -27,4 +27,4 @@ cat > "$PLIST" <<PL
 PL
 
 open "$DEST"
-echo "Nainstalováno do $DEST a spuštěno. Po přihlášení se spustí samo."
+echo "Instalado em $DEST e aberto. Abre sozinho ao iniciar sessão."
